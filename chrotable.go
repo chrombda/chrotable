@@ -1,16 +1,26 @@
 package chrotable
 
-import "github.com/elliotchance/orderedmap/v3"
+import (
+	"fmt"
+	"github.com/elliotchance/orderedmap/v3"
+)
 
 type Option[T any] func(*config[T])
 
 type config[T any] struct {
-	convertor func(item T) []Cell
+	convertor  func(item T) []Cell
+	calculator func(item T) T
 }
 
 func WithConvertor[T any](convertor func(item T) []Cell) Option[T] {
 	return func(c *config[T]) {
 		c.convertor = convertor
+	}
+}
+
+func WithConsumer[T any](calculator func(item T) T) Option[T] {
+	return func(c *config[T]) {
+		c.calculator = calculator
 	}
 }
 
@@ -72,4 +82,36 @@ func (c *Chrotable[T]) GetVariable(name string) any {
 	}
 	v, _ := c.variables.Get(name)
 	return v
+}
+
+func (c *Chrotable[T]) Push(state T) (err error) {
+
+	if c.config.convertor == nil {
+		err = fmt.Errorf("convertor is not initialized")
+		return
+	}
+
+	row := c.config.convertor(state)
+	fmt.Println(row)
+
+	return
+}
+
+func (c *Chrotable[T]) Calc(state T) (err error) {
+	if c.config.calculator == nil {
+		err = fmt.Errorf("calculator is not initialized")
+		return
+	}
+
+	n := c.config.calculator(state)
+	if n == nil {
+		return
+	}
+
+	err = c.Push(n)
+	if err != nil {
+		return
+	}
+
+	return
 }
