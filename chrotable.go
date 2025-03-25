@@ -9,7 +9,7 @@ type Option[T any] func(*config[T])
 
 type config[T any] struct {
 	convertor  func(item T) []Cell
-	calculator func(item T) T
+	calculator func(item T) (T, bool)
 }
 
 func WithConvertor[T any](convertor func(item T) []Cell) Option[T] {
@@ -18,7 +18,7 @@ func WithConvertor[T any](convertor func(item T) []Cell) Option[T] {
 	}
 }
 
-func WithConsumer[T any](calculator func(item T) T) Option[T] {
+func WithConsumer[T any](calculator func(item T) (T, bool)) Option[T] {
 	return func(c *config[T]) {
 		c.calculator = calculator
 	}
@@ -54,13 +54,31 @@ func (c *Chrotable[T]) init() {
 	}
 }
 
+func (c *Chrotable[T]) LoadConstants(constants map[string]any) {
+	c.init()
+	for k, v := range constants {
+		c.SetConstant(k, v)
+	}
+}
+
+func (c *Chrotable[T]) LoadVariables(variables map[string]any) {
+	c.init()
+	for k, v := range variables {
+		c.SetVariable(k, v)
+	}
+}
+
 func (c *Chrotable[T]) SetColumns(columns []Column) {
 	c.columns = columns
 }
 
 func (c *Chrotable[T]) SetConstant(name string, value any) {
 	c.init()
-	c.constants.Set(name, value)
+	if !c.constants.Has(name) {
+		c.constants.Set(name, value)
+	} else {
+		fmt.Printf("[chrotable] warning: constant %s set duplicatedly\n", name)
+	}
 }
 
 func (c *Chrotable[T]) GetConstant(name string) any {
@@ -103,8 +121,8 @@ func (c *Chrotable[T]) Calc(state T) (err error) {
 		return
 	}
 
-	n := c.config.calculator(state)
-	if n == nil {
+	n, ok := c.config.calculator(state)
+	if !ok {
 		return
 	}
 
